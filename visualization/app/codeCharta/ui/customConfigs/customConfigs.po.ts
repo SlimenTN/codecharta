@@ -48,7 +48,7 @@ export class CustomConfigsPageObject {
 		await page.waitForSelector(".custom-config-dialog", { hidden: true })
 	}
 
-	async fillInCustomConfigName(name = "TestConfigName") {
+	async fillInCustomConfigName(name = "TestViewName") {
 		return expect(page).toFill(".custom-config-input", name, { timeout: 3000 })
 	}
 

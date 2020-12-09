@@ -32,7 +32,7 @@ import { APIVersions, ExportCCFile } from "../codeCharta.api.model"
 import { NodeMetricDataService } from "../state/store/metricData/nodeMetricData/nodeMetricData.service"
 import packageJson from "../../../package.json"
 import { isLeaf } from "./codeMapHelper"
-import { CustomConfigItemGroup } from "../ui/customConfigs/customConfigs.component"
+import { CustomConfigItem, CustomConfigItemGroup } from "../ui/customConfigs/customConfigs.component"
 import { CustomConfigMapSelectionMode } from "../model/customConfig/customConfig.api.model"
 
 export const VALID_NODE: CodeMapNode = {
@@ -1430,84 +1430,84 @@ export const TEST_DELTA_MAP_B: CCFile = {
 }
 
 export const TEST_FILE_DATA_DOWNLOADED = {
-	projectName: "Sample Project",
 	apiVersion: packageJson.codecharta.apiVersion,
-	nodes: [
-		{
-			name: "root",
-			attributes: {},
-			type: NodeType.FOLDER,
-			children: [
-				{
-					name: "big leaf",
-					type: NodeType.FILE,
-					attributes: {
-						rloc: 100,
-						functions: 10,
-						mcc: 1
-					},
-					link: "http://www.google.de"
-				},
-				{
-					name: "Parent Leaf",
-					type: NodeType.FOLDER,
-					attributes: {},
-					children: [
-						{
-							name: "small leaf",
-							type: NodeType.FILE,
-							attributes: {
-								rloc: 30,
-								functions: 100,
-								mcc: 100
-							}
-						},
-						{
-							name: "other small leaf",
-							type: NodeType.FILE,
-							attributes: {
-								rloc: 70,
-								functions: 1000,
-								mcc: 10
-							}
-						}
-					]
-				}
-			]
-		}
-	],
 	attributeTypes: {},
-	edges: [
-		{
-			fromNodeName: "/root/big leaf",
-			toNodeName: "/root/Parent Leaf/small leaf",
-			attributes: {
-				pairingRate: 89,
-				avgCommits: 34
-			}
-		},
-		{
-			fromNodeName: "/root/Parent Leaf/small leaf",
-			toNodeName: "/root/different leaf",
-			attributes: {
-				pairingRate: 89,
-				avgCommits: 34
-			}
-		},
-		{
-			fromNodeName: "/root/Parent Leaf/other small leaf",
-			toNodeName: "/root/Parent Leaf/small leaf",
-			attributes: {
-				pairingRate: 89,
-				otherMetric: 34
-			}
-		}
-	],
-	markedPackages: [],
 	blacklist: [
 		{ path: "/root/bigLeaf.ts", type: "hide" },
 		{ path: "/root/sample1OnlyLeaf.scss", type: "exclude" }
-	]
+	],
+	edges: [
+		{
+			attributes: {
+				avgCommits: 34,
+				pairingRate: 89
+			},
+			fromNodeName: "/root/big leaf",
+			toNodeName: "/root/Parent Leaf/small leaf"
+		},
+		{
+			attributes: {
+				avgCommits: 34,
+				pairingRate: 89
+			},
+			fromNodeName: "/root/Parent Leaf/small leaf",
+			toNodeName: "/root/different leaf"
+		},
+		{
+			attributes: {
+				otherMetric: 34,
+				pairingRate: 89
+			},
+			fromNodeName: "/root/Parent Leaf/other small leaf",
+			toNodeName: "/root/Parent Leaf/small leaf"
+		}
+	],
+	markedPackages: [],
+	nodes: [
+		{
+			attributes: {},
+			children: [
+				{
+					attributes: {
+						functions: 10,
+						mcc: 1,
+						rloc: 100
+					},
+					link: "http://www.google.de",
+					name: "big leaf",
+					type: NodeType.FILE
+				},
+				{
+					attributes: {},
+					children: [
+						{
+							attributes: {
+								functions: 100,
+								mcc: 100,
+								rloc: 30
+							},
+							name: "small leaf",
+							type: NodeType.FILE
+						},
+						{
+							attributes: {
+								functions: 1000,
+								mcc: 10,
+								rloc: 70
+							},
+							name: "other small leaf",
+							type: NodeType.FILE
+						}
+					],
+					name: "Parent Leaf",
+					type: NodeType.FOLDER
+				}
+			],
+			name: "root",
+			type: NodeType.FOLDER
+		}
+	],
+	projectName: "Sample Project"
 }
 
 export const FILE_STATES: FileState[] = [
@@ -1837,7 +1837,31 @@ export const SCENARIO_ITEMS: ScenarioItem[] = [
 	}
 ]
 
-export const CUSTOM_CONFIG_ITEM_GROUPS: Map<string, CustomConfigItemGroup> = new Map([
+export const CUSTOM_VIEW_ITEMS: CustomConfigItem[] = [
+	{
+		id: "SINGLEfileASampleMap View #1",
+		name: "SampleMap View #1",
+		mapNames: "fileA",
+		mapSelectionMode: CustomConfigMapSelectionMode.SINGLE,
+		isApplicable: true
+	},
+	{
+		id: "SINGLEfileAAnotherMap View #1",
+		name: "AnotherMap View #1",
+		mapNames: "fileB",
+		mapSelectionMode: CustomConfigMapSelectionMode.SINGLE,
+		isApplicable: false
+	},
+	{
+		id: "SINGLEfileASampleMap View #2",
+		name: "SampleMap View #2",
+		mapNames: "fileA",
+		mapSelectionMode: CustomConfigMapSelectionMode.SINGLE,
+		isApplicable: true
+	}
+]
+
+export const CUSTOM_VIEW_ITEM_GROUPS: Map<string, CustomConfigItemGroup> = new Map([
 	[
 		"fileAfileBSINGLE",
 		{

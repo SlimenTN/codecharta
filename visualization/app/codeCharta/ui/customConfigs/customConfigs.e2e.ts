@@ -20,7 +20,7 @@ describe("CustomConfigs", () => {
 		// Enable experimental CustomConfigs Feature first
 		await customConfigs.enableExperimentalFeatures()
 
-		await customConfigs.addCustomConfig("TestConfigName")
+		await customConfigs.addCustomConfig("TestViewName")
 
 		// Open Again
 		await customConfigs.openCustomConfigAddDialog()
@@ -34,13 +34,13 @@ describe("CustomConfigs", () => {
 	it("Custom Configs for SINGLE, MULTIPLE, DELTA mode will be shown in separate groups (grouped by selection mode) and can be collapsed properly", async () => {
 		// Enable experimental CustomConfigs Feature first
 		await customConfigs.enableExperimentalFeatures()
-		await customConfigs.addCustomConfig("TestSingleConfig")
+		await customConfigs.addCustomConfig("TestSingleView")
 
 		await customConfigs.switchToMultipleMode()
-		await customConfigs.addCustomConfig("TestMultipleConfig")
+		await customConfigs.addCustomConfig("TestMultipleView")
 
 		await customConfigs.switchToDeltaMode()
-		await customConfigs.addCustomConfig("TestDeltaConfig")
+		await customConfigs.addCustomConfig("TestDeltaView")
 
 		// Open
 		await customConfigs.openCustomConfigPanel()

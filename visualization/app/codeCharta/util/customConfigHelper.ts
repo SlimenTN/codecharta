@@ -1,28 +1,20 @@
 "use strict"
-import { LocalStorageCustomConfigs, stateObjectReplacer, stateObjectReviver } from "../codeCharta.model"
+import { LocalStorageCustomConfigs, RecursivePartial, stateObjectReplacer, stateObjectReviver } from "../codeCharta.model"
 import { CustomConfigItemGroup } from "../ui/customConfigs/customConfigs.component"
-import {
-	CustomConfig,
-	CustomConfigMapSelectionMode,
-	CustomConfigsDownloadFile,
-	ExportCustomConfig
-} from "../model/customConfig/customConfig.api.model"
+import { CustomConfig, CustomConfigMapSelectionMode } from "../model/customConfig/customConfig.api.model"
 import { CustomConfigFileStateConnector } from "../ui/customConfigs/customConfigFileStateConnector"
-import { FileNameHelper } from "./fileNameHelper"
-import { FileDownloader } from "./fileDownloader"
-
-export const CUSTOM_CONFIG_FILE_EXTENSION = ".cc.config.json"
-const CUSTOM_CONFIGS_LOCAL_STORAGE_VERSION = "1.0.0"
-const CUSTOM_CONFIGS_DOWNLOAD_FILE_VERSION = "1.0.0"
-export const CUSTOM_CONFIGS_LOCAL_STORAGE_ELEMENT = "CodeCharta::customConfigs"
+import { createCustomConfigIdentifier } from "./customConfigBuilder"
 
 export class CustomConfigHelper {
-	private static customConfigs: Map<string, CustomConfig> = CustomConfigHelper.loadCustomConfigs()
+	private static readonly CUSTOM_VIEWS_LOCAL_STORAGE_VERSION = "1.0.0"
+	private static readonly CUSTOM_VIEWS_LOCAL_STORAGE_ELEMENT = "CodeCharta::customConfigs"
+
+	private static customConfigs: Map<string, RecursivePartial<CustomConfig>> = CustomConfigHelper.loadCustomConfigs()
 
 	static getCustomConfigItemGroups(customConfigFileStateConnector: CustomConfigFileStateConnector): Map<string, CustomConfigItemGroup> {
 		const customConfigItemGroups: Map<string, CustomConfigItemGroup> = new Map()
 
-		CustomConfigHelper.customConfigs.forEach(customConfig => {
+		this.customConfigs.forEach(customConfig => {
 			const groupKey = `${customConfig.assignedMaps.join("_")}_${customConfig.mapSelectionMode}`
 
 			if (!customConfigItemGroups.has(groupKey)) {
@@ -34,7 +26,7 @@ export class CustomConfigHelper {
 				})
 			}
 
-			const customConfigItemApplicable = CustomConfigHelper.isCustomConfigApplicable(customConfigFileStateConnector, customConfig)
+			const customConfigItemApplicable = this.isCustomConfigApplicable(customConfigFileStateConnector, customConfig)
 			customConfigItemGroups.get(groupKey).customConfigItems.push({
 				id: customConfig.id,
 				name: customConfig.name,
@@ -51,124 +43,54 @@ export class CustomConfigHelper {
 		return customConfigItemGroups
 	}
 
-	private static isCustomConfigApplicable(customConfigFileStateConnector: CustomConfigFileStateConnector, customConfig: CustomConfig) {
-		// Configs are applicable if their mapChecksums (and mode) are matching, therefore, map names must not be checked.
+	private static isCustomConfigApplicable(
+		customConfigFileStateConnector: CustomConfigFileStateConnector,
+		customConfig: RecursivePartial<CustomConfig>
+	) {
+		// TODO: Follow Up: Configs are applicable if their checksums are matching, but map names should not be checked.
 		return (
+			customConfigFileStateConnector.getJointMapName() === customConfig.assignedMaps.join(" ") &&
 			customConfigFileStateConnector.getChecksumOfAssignedMaps() === customConfig.mapChecksum &&
 			customConfigFileStateConnector.getMapSelectionMode() === customConfig.mapSelectionMode
 		)
 	}
 
 	private static setCustomConfigsToLocalStorage() {
-		// TODO: #684 adapt storing Configs and Scenarios for standalone version
 		const newLocalStorageElement: LocalStorageCustomConfigs = {
-			version: CUSTOM_CONFIGS_LOCAL_STORAGE_VERSION,
-			customConfigs: [...CustomConfigHelper.customConfigs]
+			version: this.CUSTOM_VIEWS_LOCAL_STORAGE_VERSION,
+			customConfigs: [...this.customConfigs]
 		}
-		localStorage.setItem(CUSTOM_CONFIGS_LOCAL_STORAGE_ELEMENT, JSON.stringify(newLocalStorageElement, stateObjectReplacer))
+		localStorage.setItem(this.CUSTOM_VIEWS_LOCAL_STORAGE_ELEMENT, JSON.stringify(newLocalStorageElement, stateObjectReplacer))
 	}
 
 	private static loadCustomConfigs() {
 		const ccLocalStorage: LocalStorageCustomConfigs = JSON.parse(
-			localStorage.getItem(CUSTOM_CONFIGS_LOCAL_STORAGE_ELEMENT),
+			localStorage.getItem(this.CUSTOM_VIEWS_LOCAL_STORAGE_ELEMENT),
 			stateObjectReviver
 		)
 		return new Map(ccLocalStorage?.customConfigs)
 	}
 
-	static addCustomConfig(newCustomConfig: CustomConfig) {
-		CustomConfigHelper.customConfigs.set(newCustomConfig.id, newCustomConfig)
-		CustomConfigHelper.setCustomConfigsToLocalStorage()
+	static addCustomConfig(newCustomConfig: RecursivePartial<CustomConfig>) {
+		this.customConfigs.set(newCustomConfig.id, newCustomConfig)
+		this.setCustomConfigsToLocalStorage()
 	}
 
-	static getCustomConfigSettings(configId: string): CustomConfig | undefined {
-		return CustomConfigHelper.customConfigs.get(configId)
+	static getCustomConfigSettings(viewId: string): RecursivePartial<CustomConfig> | undefined {
+		return this.customConfigs.get(viewId)
 	}
 
-	static hasCustomConfigByName(mapSelectionMode: CustomConfigMapSelectionMode, selectedMaps: string[], configName: string): boolean {
-		for (const customConfig of CustomConfigHelper.customConfigs.values()) {
-			if (
-				customConfig.name === configName &&
-				customConfig.mapSelectionMode === mapSelectionMode &&
-				customConfig.assignedMaps.join("") === selectedMaps.join("")
-			) {
-				return true
-			}
-		}
+	static hasCustomConfig(mapSelectionMode: CustomConfigMapSelectionMode, selectedMaps: string[], viewName: string): boolean {
+		const customConfigIdentifier = createCustomConfigIdentifier(mapSelectionMode, selectedMaps, viewName)
 
-		return false
-	}
-
-	static getCustomConfigs(): Map<string, CustomConfig> {
-		return CustomConfigHelper.customConfigs
-	}
-
-	static importCustomConfigs(content: string) {
-		const importedCustomConfigsFile: CustomConfigsDownloadFile = JSON.parse(content, stateObjectReviver)
-
-		for (const exportedConfig of importedCustomConfigsFile.customConfigs.values()) {
-			const alreadyExistingConfig = CustomConfigHelper.getCustomConfigSettings(exportedConfig.id)
-
-			// Check for a duplicate Config by matching checksums
-			if (alreadyExistingConfig) {
-				continue
-			}
-
-			// Prevent different Configs with the same name
-			if (
-				CustomConfigHelper.hasCustomConfigByName(exportedConfig.mapSelectionMode, exportedConfig.assignedMaps, exportedConfig.name)
-			) {
-				exportedConfig.name += ` (${FileNameHelper.getFormattedTimestamp(new Date(exportedConfig.creationTime))})`
-			}
-
-			const importedCustomConfig: CustomConfig = {
-				id: exportedConfig.id,
-				name: exportedConfig.name,
-				creationTime: exportedConfig.creationTime,
-				assignedMaps: exportedConfig.assignedMaps,
-				customConfigVersion: exportedConfig.customConfigVersion,
-				mapChecksum: exportedConfig.mapChecksum,
-				mapSelectionMode: exportedConfig.mapSelectionMode,
-				stateSettings: exportedConfig.stateSettings
-			}
-
-			CustomConfigHelper.addCustomConfig(importedCustomConfig)
-		}
-	}
-
-	static downloadCustomConfigs(
-		customConfigs: Map<string, ExportCustomConfig>,
-		customConfigFileStateConnector: CustomConfigFileStateConnector
-	) {
-		const customConfigsDownloadFile: CustomConfigsDownloadFile = {
-			downloadApiVersion: CUSTOM_CONFIGS_DOWNLOAD_FILE_VERSION,
-			timestamp: Date.now(),
-			customConfigs
-		}
-
-		let fileName = FileNameHelper.getNewTimestamp() + CUSTOM_CONFIG_FILE_EXTENSION
-
-		if (
-			!customConfigFileStateConnector.isDeltaMode() &&
-			customConfigFileStateConnector.getAmountOfUploadedFiles() === 1 &&
-			customConfigFileStateConnector.isEachFileSelected()
-		) {
-			// If only one map is uploaded/present in SINGLE mode, prefix the .cc.config.json file with its name.
-			fileName = `${FileNameHelper.withoutCCJsonExtension(customConfigFileStateConnector.getJointMapName())}_${fileName}`
-		}
-
-		FileDownloader.downloadData(JSON.stringify(customConfigsDownloadFile, stateObjectReplacer), fileName)
-	}
-
-	static createExportCustomConfigFromConfig(customConfig: CustomConfig): ExportCustomConfig {
-		return { ...customConfig }
+		return this.customConfigs.has(customConfigIdentifier)
 	}
 
 	static getCustomConfigsAmountByMapAndMode(mapNames: string, mapSelectionMode: CustomConfigMapSelectionMode): number {
 		let count = 0
 
-		CustomConfigHelper.customConfigs.forEach(config => {
-			if (config.assignedMaps.join(" ") === mapNames && config.mapSelectionMode === mapSelectionMode) {
+		this.customConfigs.forEach(view => {
+			if (view.assignedMaps.join(" ") === mapNames && view.mapSelectionMode === mapSelectionMode) {
 				count++
 			}
 		})
@@ -176,10 +98,10 @@ export class CustomConfigHelper {
 		return count
 	}
 
-	static getConfigNameSuggestionByFileState(customConfigFileStateConnector: CustomConfigFileStateConnector): string {
-		const suggestedConfigName = customConfigFileStateConnector.getJointMapName()
+	static getViewNameSuggestionByFileState(customConfigFileStateConnector: CustomConfigFileStateConnector): string {
+		const suggestedViewName = customConfigFileStateConnector.getJointMapName()
 
-		if (!suggestedConfigName) {
+		if (!suggestedViewName) {
 			return ""
 		}
 
@@ -189,20 +111,12 @@ export class CustomConfigHelper {
 				customConfigFileStateConnector.getMapSelectionMode()
 			) + 1
 
-		return `${suggestedConfigName} #${customConfigNumberSuffix}`
+		return `${suggestedViewName} #${customConfigNumberSuffix}`
 	}
 
-	static deleteCustomConfigs(customConfigs: CustomConfig[]) {
-		for (const customConfig of customConfigs) {
-			CustomConfigHelper.customConfigs.delete(customConfig.id)
-		}
-
-		CustomConfigHelper.setCustomConfigsToLocalStorage()
-	}
-
-	static deleteCustomConfig(configId: string) {
-		CustomConfigHelper.customConfigs.delete(configId)
-		CustomConfigHelper.setCustomConfigsToLocalStorage()
+	static deleteCustomConfig(viewId: string) {
+		this.customConfigs.delete(viewId)
+		this.setCustomConfigsToLocalStorage()
 	}
 
 	static sortCustomConfigDropDownGroupList(a: CustomConfigItemGroup, b: CustomConfigItemGroup) {
